@@ -26,16 +26,27 @@ class Optimizer:
         self.network = net
 
     def forward_propagate(self, input_data):
-        cost = 0
         A = input_data
+        L = len(self.network.layers)
+        for l in range(L - 1):
+            self.layers[l].linear_forward(A)
+            A = self.layers[l].sigmoid_forward()
+        cost = self.layers[L - 1]
+        return cost
 
-        for layer in self.network.layers:
-            layer.sigmoid_forward()
+
+    def backward_propogate(self):
+        for layer in
+
+
+    def compute_cost(self, Y, AL): ##TODO: Update this to be more versitile
+        m = Y.shape[1]
+        cost = -(1 / m) * np.sum(np.multiply(np.log(AL), Y) + np.multiply(np.log(1 - AL), (1 - Y)))
+        cost = np.squeeze(cost)
+        assert (cost.shape == ())
 
         return cost
 
-    def backward_propogate(self):
-        return
 
 class Layer:
     def __init__(self):
@@ -76,8 +87,9 @@ class Layer:
         assert (self.W.shape == (n_h, n_x))
         assert (self.b.shape == (n_h, 1))
 
-    def linear_forward(self):
-        self.Z = np.dot(self.W.T, self.A) + self.b
+    def linear_forward(self, input_vector):
+        self.A = input_vector
+        self.Z = np.dot(self.W.T, input_vector) + self.b
         return self.Z
 
     def relu_forward(self):
@@ -90,13 +102,17 @@ class Layer:
     def relu_backward(self):
         return
 
-    def sigmoid_backward(self, m, A):
+    def sigmoid_backward(self, m, A, dZ):
         """
 
         :param m:
-        :param A:
+        :param A: The previous layer, ie: this layer's input
         :return: The gradients of the layer
         """
+        # Need W_prev, dZ_prev
+        # dZ = A - Y for output layer
+        # dZ = np.dot(W2.T, dZ2) * (1 - np.power(A1, 2))
+
         self.dW = (1 / m) * np.dot(self.dZ, A.T)
         self.db = (1 / m) * np.sum(self.dZ, axis=1, keepdims=True)
 

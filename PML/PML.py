@@ -22,31 +22,32 @@ class Optimizer:
 
     """
     def __init__(self, net):
-        self.placeholder = None
         self.network = net
 
-    def forward_propagate(self, input_data):
+    def forward_propagate(self, input_data, Y):
         A = input_data
         L = len(self.network.layers)
         for l in range(L - 1):
             self.layers[l].linear_forward(A)
             A = self.layers[l].sigmoid_forward()
-        cost = self.layers[L - 1]
+        cost = self.compute_cost(Y,A)
         return cost
 
 
     def backward_propogate(self):
-        for layer in
+        L = len(self.network.layers)
+        for l in reversed(range(L - 1)):
+            self.layers[l].linear_backward()
+            self.layers[l].sigmoid_backwards()
 
-
-    def compute_cost(self, Y, AL): ##TODO: Update this to be more versitile
+    def compute_cost(self, Y, AL):
+        # TODO: Update this to be more versatile
         m = Y.shape[1]
         cost = -(1 / m) * np.sum(np.multiply(np.log(AL), Y) + np.multiply(np.log(1 - AL), (1 - Y)))
         cost = np.squeeze(cost)
         assert (cost.shape == ())
 
         return cost
-
 
 class Layer:
     def __init__(self):
@@ -61,10 +62,13 @@ class Layer:
 
         self.A = None
         self.Z = None
+        self.A_prev = None
 
         self.dZ = None
         self.dW = None
         self.db = None
+
+        self.dA = None
 
         self.activation_function = None
 
@@ -87,33 +91,44 @@ class Layer:
         assert (self.W.shape == (n_h, n_x))
         assert (self.b.shape == (n_h, 1))
 
-    def linear_forward(self, input_vector):
-        self.A = input_vector
-        self.Z = np.dot(self.W.T, input_vector) + self.b
+    def linear_forward(self, input_A):
+        self.A_prev = input_A
+        self.Z = np.dot(self.W.T, input_A) + self.b
         return self.Z
 
     def relu_forward(self):
         return
 
     def sigmoid_forward(self):
-        self.A = 1/(1 + np.exp(self.Z))
+        self.A = 1/(1 + np.exp(-self.Z))
         return self.A
+
+    def sigmoid_backward(self, dA):
+        sig_deriv = np.exp(self.Z) / np.power((np.exp(self.Z) + 1), 2)
+        self.dZ = dA * sig_deriv
+
+        return self.dZ
 
     def relu_backward(self):
         return
 
-    def sigmoid_backward(self, m, A, dZ):
+    def linear_backward(self, dZ):
         """
 
-        :param m:
-        :param A: The previous layer, ie: this layer's input
+        :param dZ:
         :return: The gradients of the layer
         """
         # Need W_prev, dZ_prev
         # dZ = A - Y for output layer
         # dZ = np.dot(W2.T, dZ2) * (1 - np.power(A1, 2))
+        m = self.A_prev.shape[1]
 
-        self.dW = (1 / m) * np.dot(self.dZ, A.T)
-        self.db = (1 / m) * np.sum(self.dZ, axis=1, keepdims=True)
+        # print("dZ Shape:", dZ.shape)
+        # print("dA_prev shape:", self.A_prev.shape)
+        # print("W shape:", self.W.shape)
 
-        return self.dW, self.db
+        self.dW = (1 / m) * np.dot(dZ, self.A_prev.T)
+        self.db = (1 / m) * np.sum(dZ, axis=1, keepdims=True)
+        dA_prev = np.dot(self.W.T, dZ)
+
+        return self.dW, self.db, dA_prev

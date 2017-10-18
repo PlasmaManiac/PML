@@ -1,10 +1,10 @@
 # Python Machine Learning Module
 # A project made for the purpose practising Machine Learning Concepts
 # Built in reference to techniques shown in Andrew Ng's Deep Learning Course
+# Inspired by Andrej Karpathy's JS library
 # Project by: Luke Martin
 
 import numpy as np
-# import matplotlib.pyplot as plt
 
 
 class Network:
@@ -17,37 +17,67 @@ class Network:
     def add_layer(self, layer):
         self.layers.append(layer)
 
-class Optimizer:
-    """
-
-    """
-    def __init__(self, net):
-        self.network = net
-
     def forward_propagate(self, input_data, Y):
         A = input_data
         L = len(self.network.layers)
         for l in range(L - 1):
             self.layers[l].linear_forward(A)
             A = self.layers[l].sigmoid_forward()
-        cost = self.compute_cost(Y,A)
+        cost = self.compute_cost(Y, A)
         return cost
 
-
-    def backward_propogate(self):
-        L = len(self.network.layers)
+    def back_propogate(self, labels):
+        L = len(self.layers)
+        dA = None
         for l in reversed(range(L - 1)):
-            self.layers[l].linear_backward()
-            self.layers[l].sigmoid_backwards()
+            if l is L-1:
+                AL = self.layers[l].A
+                # TODO: Update this for the output layer
+                dA =  (np.divide(labels, AL) - np.divide(1 - layers, 1 - AL))
+            else:
+                dZ = self.layers[l].sigmoid_backwards(dA) # Requires dA
+                dA = self.layers[l].linear_backward(dZ) # Require dZ
+
+
+class Optimizer:
+    """
+
+    """
+    def __init__(self, net):
+        self.network = net
+        self.learning_rate = None
+
+
+    def train(self, input_data, labels, iterations=100):
+        for i in range(iterations):
+            cost = self.network.forward_propagate(input_data, labels)
+            self.network.back_propogate()
+            self.update_parameters()
+
+            print(cost)
 
     def compute_cost(self, Y, AL):
+        """
+
+        :param Y:
+        :param AL:
+        :return:
+        """
         # TODO: Update this to be more versatile
         m = Y.shape[1]
+        Y = Y.reshape(AL.shape)
         cost = -(1 / m) * np.sum(np.multiply(np.log(AL), Y) + np.multiply(np.log(1 - AL), (1 - Y)))
         cost = np.squeeze(cost)
         assert (cost.shape == ())
 
         return cost
+
+    def update_parameters(self):
+        L = len(self.network.layers)
+        for l in range(L-1):
+            self.network.layers[l].W -= self.network.layers[l].dW * self.learning_rate
+            self.network.layers[l].b -= self.network.layers[l].db * self.learning_rate
+
 
 class Layer:
     def __init__(self):
@@ -106,7 +136,6 @@ class Layer:
     def sigmoid_backward(self, dA):
         sig_deriv = np.exp(self.Z) / np.power((np.exp(self.Z) + 1), 2)
         self.dZ = dA * sig_deriv
-
         return self.dZ
 
     def relu_backward(self):
@@ -132,3 +161,4 @@ class Layer:
         dA_prev = np.dot(self.W.T, dZ)
 
         return self.dW, self.db, dA_prev
+

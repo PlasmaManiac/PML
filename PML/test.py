@@ -37,6 +37,7 @@ def linear_backward_test1():
 
     return dW, db, dA_prev
 
+
 def sigmoid_backward_test1():
     Z = np.array([0.04153939, -1.11792545], ndmin=2)
     dA = np.array([-0.41675785, -0.05626683], ndmin=2)

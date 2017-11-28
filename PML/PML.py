@@ -12,38 +12,53 @@ class Network:
     """
 
     """
-    def __init__(self):
+    def __init__(self, layers):
         self.layers = []
+        self.L = 0
+
+        for layer in layers:
+            self.add_layer(layer)
 
     def add_layer(self, layer):
         self.layers.append(layer)
+        self.L += 1
 
     def forward_propagate(self, input_data):
         A = input_data
-        L = len(self.layers)
+        L = self.L
         for l in range(L):
-            # print("Layer: ", l)
             A = self.layers[l].forward_propagate(A)
-            # print("Z" + str(l + 1) + "= ", Z)
-            # print("A" + str(l + 1) + "= ", A)
 
         return A
 
-
-
     def back_propagate(self, labels, AL):
-        L = len(self.layers)
-        dA = -1 * (np.divide(labels, AL) - np.divide(1 - labels, 1 - AL))
-        dZ = AL - labels
-        dA = self.layers[L - 1].linear_backward(dZ)
-        for l in reversed(range(L - 1)):
-            self.layers[l].back_propagate(dA)
+        L = self.L
+        # dA = -1 * (np.divide(labels, AL) - np.divide(1 - labels, 1 - AL))
+
+        for l in reversed(range(L)):
+            if l is L - 1:
+                dZ = AL - labels
+                # dZ = -(np.divide(labels, AL) - np.divide(1 - labels, 1 - AL))
+                self.layers[l].dZ = dZ
+            else:
+                dZ = self.layers[l].back_propagate(self.layers[l+1].dZ, self.layers[l+1].W)
+
+            self.layers[l].linear_backward(dZ)
+
+        # for l in reversed(range(L)):
+         # self.layers[l].back_propagate(dA)
             # dZ = self.layers[l].sigmoid_backward(dA) # Requires dA
             # _,_, dA = self.layers[l].linear_backward(dZ)  # Require dZ
 
     def predict(self, input_data):
         AL = self.forward_propagate(input_data)
-        prediction = 1*(AL > 0.5)
+        if(self.layers[self.L - 1].act_func is "sigmoid"):
+            prediction = 1*(AL > 0.5)
+        elif(self.layers[self.L - 1].act_func is "softmax"):
+            prediction = AL
+            # TODO: fix the softmax predictor
+
+        # TODO: Change this based on the type of output layer. (softmax, Logistic)
         return prediction
 
     def plot_decision_boundary(self, X, y):
@@ -51,14 +66,9 @@ class Network:
         x_min, x_max = X[:, 0].min() - .5, X[:, 0].max() + .5
         y_min, y_max = X[:, 1].min() - .5, X[:, 1].max() + .5
 
-        print("x min/max = ", x_min, x_max)
-        print("y min/max = ", y_min, y_max)
         h = 0.01
         # Generate a grid of points with distance h between them
         xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
-
-        print("xx shape = ", xx.shape)
-        print("yy shape = ", yy.shape)
 
         mesh_points = np.array([xx.ravel(), yy.ravel()])
 
@@ -75,9 +85,10 @@ class Optimizer:
     """
 
     """
-    def __init__(self, net):
+    def __init__(self, net, learning_rate=0.1):
         self.network = net
-        self.learning_rate = 1.2
+        self.learning_rate = learning_rate
+        self.costs = []
 
     def train(self, input_data, labels, iterations=10000):
         for i in range(iterations):
@@ -88,6 +99,7 @@ class Optimizer:
             self.update_parameters()
             if i % 1000 is 0:
                 print("iteration: ",i," cost = ", cost)
+                self.costs.append(cost)
 
     def compute_cost(self, Y, AL):
         """
@@ -98,19 +110,37 @@ class Optimizer:
         """
         # TODO: Update this to be more versatile
         m = Y.shape[1]
-        logprobs = np.multiply(np.log(AL), Y) + np.multiply(np.log(1 - AL), (1 - Y))
-        cost = -1 * (1 / m) * np.sum(logprobs)
+        logprobs = np.multiply(np.log(AL), Y) + np.multiply(np.log(1 - AL), 1 - Y)
+        cost = -1 *np.sum(logprobs) * (1 / m)
         cost = np.squeeze(cost)
         assert (cost.shape == ())
-
         return cost
 
     def update_parameters(self):
         L = len(self.network.layers)
         for l in range(L):
-            self.network.layers[l].W -= self.network.layers[l].dW * self.learning_rate
-            self.network.layers[l].b -= self.network.layers[l].db * self.learning_rate
+            self.network.layers[l].W = self.network.layers[l].W - self.network.layers[l].dW * self.learning_rate
+            self.network.layers[l].b = self.network.layers[l].b - self.network.layers[l].db * self.learning_rate
 
+    def plot_cost(self):
+        plt.plot(np.array(self.costs))
+        # plt.axis(0, 5, 0, 10000)
+        plt.show()
+
+    def compute_accuracy(self, X, labels):
+        accuracy = 0.0
+
+        AL = self.network.predict(X)
+
+        predictions = AL.argmax(axis=0)
+
+        print("Predictions = ", predictions)
+        print("True labels = ", labels)
+        print("Correct = ", predictions == labels)
+
+        accuracy = sum(1*(predictions == labels)) / labels.shape[0]
+
+        return accuracy
 
 class Layer:
     def __init__(self, act_func):
@@ -134,9 +164,7 @@ class Layer:
 
         self.dA = None
 
-        self.activation_function = None
-
-    def initialize(self, n_x, n_h, layer_type="fc"):
+    def initialize(self, n_x, n_h):
         """
         :param n_x: size of input layer
         :param n_h: size of hidden layer
@@ -146,10 +174,8 @@ class Layer:
         self.n_x = n_x
         self.n_h = n_h
 
-        self.layer_type = layer_type
-
-        self.W = np.random.randn(n_h, n_x) * 0.01
-        self.b = np.zeros((n_h,1))
+        self.W = np.random.randn(n_h, n_x) * 0.1
+        self.b = np.zeros((n_h, 1))
 
         assert (self.W.shape == (n_h, n_x))
         assert (self.b.shape == (n_h, 1))
@@ -158,23 +184,25 @@ class Layer:
 
     def linear_forward(self, input_A):
         self.A_prev = input_A
-        # print("W shape = ", self.W.shape)
-        # print("Input shape = ", input_A.shape)
         self.Z = np.dot(self.W, input_A) + self.b
-        # print("Output shape =  ", self.Z.shape)
+
         return self.Z
 
-    def relu_forward(self):
-        return
+    def relu_forward(self, Z):
+        self.A = np.maximum(Z, 0)
+        return self.A
 
-    def relu_backward(self):
-        return
+    def relu_backward(self, dZ_prev, W_prev):
+        dA = np.dot(W_prev.T, dZ_prev)
+        self.dZ = 1*(dA > 1)
+        return self.dZ
 
     def tanh_forward(self, Z):
         self.A = np.tanh(Z)
         return self.A
 
-    def tanh_backward(self, dA):
+    def tanh_backward(self, dZ_prev, W_prev):
+        dA = np.dot(W_prev.T, dZ_prev)
         self.dZ = dA * (1 - np.power(self.A, 2))
         return self.dZ
 
@@ -182,10 +210,20 @@ class Layer:
         self.A = 1/(1 + np.exp(-Z))
         return self.A
 
-    def sigmoid_backward(self, dA):
+    def sigmoid_backward(self, dZ_prev, W_prev):
+
+        dA = np.dot(W_prev.T, dZ_prev)
         sig_deriv = np.exp(self.Z) / np.power((np.exp(self.Z) + 1), 2)
         self.dZ = dA * sig_deriv
         return self.dZ
+
+    def softmax_forward(self, Z):
+        Z_e = np.exp(Z)
+        self.A = Z_e / np.sum(Z_e, axis=0)
+        return self.A
+
+    def softmax_backward(self):
+        return None
 
     def linear_backward(self, dZ):
         """
@@ -198,31 +236,20 @@ class Layer:
         # dZ = np.dot(W2.T, dZ2) * (1 - np.power(A1, 2))
         m = self.A_prev.shape[1]
 
-        # print("dZ Shape:", dZ.shape)
-        # print("dA_prev shape:", self.A_prev.shape)
-        # print("W shape:", self.W.shape)
-
         self.dW = (1 / m) * np.dot(dZ, self.A_prev.T)
         self.db = (1 / m) * np.sum(dZ, axis=1, keepdims=True)
 
-        # print("dW = ", self.dW)
-        # print("db = ", self.db)
+        return self.dW, self.db
 
-        dA_prev = np.dot(self.W.T, dZ)
-
-        return dA_prev, self.dW, self.db
-
-    def back_propagate(self, dA):
+    def back_propagate(self, dZ_prev, W_prev):
         dZ = None
         if self.act_func is "sigmoid":
-            dZ = self.sigmoid_backward(dA)
+            dZ = self.sigmoid_backward(dZ_prev, W_prev)
         elif self.act_func is "relu":
-            dZ = self.relu_backward()
+            dZ = self.relu_backward(dZ_prev, W_prev)
         elif self.act_func is "tanh":
-            dZ = self.tanh_backward(dA)
-
-        dA_prev, dW, db = self.linear_backward(dZ)
-        return dA_prev
+            dZ = self.tanh_backward(dZ_prev, W_prev)
+        return dZ
 
     def forward_propagate(self, prev_A):
         Z = self.linear_forward(prev_A)
@@ -232,6 +259,8 @@ class Layer:
         elif self.act_func is "sigmoid":
             A = self.sigmoid_forward(Z)
         elif self.act_func is "relu":
-            A = self.relu_forward()
+            A = self.relu_forward(Z)
+        elif self.act_func is  "softmax":
+            A = self.softmax_forward(Z)
 
         return A

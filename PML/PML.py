@@ -61,6 +61,7 @@ class Network:
         # TODO: Change this based on the type of output layer. (softmax, Logistic)
         return prediction
 
+
     def plot_decision_boundary(self, X, y):
         # Set min and max values and give it some padding
         x_min, x_max = X[:, 0].min() - .5, X[:, 0].max() + .5
@@ -79,7 +80,6 @@ class Network:
         plt.contourf(xx, yy, Z, cmap=plt.cm.Spectral)
         plt.scatter(X[:, 0], X[:, 1], c=y, cmap=plt.cm.Spectral)
         plt.show()
-
 
 class Optimizer:
     """
@@ -143,7 +143,7 @@ class Optimizer:
         return accuracy
 
 class Layer:
-    def __init__(self, act_func):
+    def __init__(self, act_func, type="fc"):
         self.n_x = None
         self.n_h = None
 
@@ -161,14 +161,18 @@ class Layer:
         self.dZ = None
         self.dW = None
         self.db = None
-
         self.dA = None
 
-    def initialize(self, n_x, n_h):
+        self.type = type
+
+        if type is "conv":
+            self.stride = None
+            self.pad = None
+
+    def initialize(self, n_x, n_h, pad=None, stride=None):
         """
         :param n_x: size of input layer
         :param n_h: size of hidden layer
-        :param n_y: size of ouput layer
         :param layer_type: the type of the layer
         """
         self.n_x = n_x
@@ -181,6 +185,12 @@ class Layer:
         assert (self.b.shape == (n_h, 1))
 
         return self.W, self.b
+
+    def zero_pad(X, pad):
+
+        X_pad = np.pad(X, ((0, 0), (pad, pad), (pad, pad), (0, 0)), "constant")
+
+        return X_pad
 
     def linear_forward(self, input_A):
         self.A_prev = input_A
@@ -240,6 +250,50 @@ class Layer:
         self.db = (1 / m) * np.sum(dZ, axis=1, keepdims=True)
 
         return self.dW, self.db
+
+    def conv_single_step(self, a_slice, W, b):
+        Z = np.sum(a_slice*W) + float(b)
+        return Z
+
+    def conv_forward(self, A_prev):
+        ## GRADED FUNCTION: conv_forward
+        (m, n_H_prev, n_W_prev, n_C_prev) = A_prev.shape
+
+        (f, f, n_C_prev, n_C) = self.W.shape
+
+        stride = self.stride
+        pad = self.pad
+
+        n_H = int((n_H_prev - f + 2 * pad) / stride) + 1
+        n_W = int((n_W_prev - f + 2 * pad) / stride) + 1
+
+        # Initialize the output volume Z with zeros. (≈1 line)
+        self.Z = np.zeros((m, n_H, n_W, n_C))
+
+        # Create A_prev_pad by padding A_prev
+        A_prev_pad = self.zero_pad(A_prev, pad)
+
+        for i in range(m):  # loop over the batch of training examples
+            a_prev_pad = A_prev_pad[i, :, :, :]  # Select ith training example's padded activation
+            for h in range(n_H):  # loop over vertical axis of the output volume
+                for w in range(n_W):  # loop over horizontal axis of the output volume
+                    for c in range(n_C):  # loop over channels (= #filters) of the output volume
+
+                        # Find the corners of the current "slice"
+                        vert_start = h * stride
+                        vert_end = h * stride + f
+                        horiz_start = w * stride
+                        horiz_end = w * stride + f
+
+                        # Use the corners to define the (3D) slice of a_prev_pad (See Hint above the cell)
+                        a_slice_prev = a_prev_pad[vert_start:vert_end, horiz_start:horiz_end, :]
+
+                        # Convolve the (3D) slice with the correct filter W and bias b, to get back one output neuron.
+                        self.Z[i, h, w, c] = self.conv_single_step(a_slice_prev, self.W[:, :, :, c], self.b[:, :, :, c])
+
+            assert (self.Z.shape == (m, n_H, n_W, n_C))
+        return self.Z
+
 
     def back_propagate(self, dZ_prev, W_prev):
         dZ = None

@@ -2,6 +2,7 @@ import os.path
 import sys
 import sklearn
 import sklearn.datasets
+from sklearn.datasets import load_digits
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -67,47 +68,6 @@ def sigmoid_backward_test1():
     dZ = test_layer.sigmoid_backward(dA)
     print("[ML]    dZ  = ", str(dZ))
     print("[Truth] dZ  =  [[-0.10414453 -0.01044791]]")
-
-
-def model_test1():
-    net = ml.Network()
-
-    layer1 = ml.Layer("tanh")
-    layer1.initialize(2, 3)
-
-    layer2 = ml.Layer("sigmoid")
-    layer2.initialize(3, 1)
-
-    layer3 = ml.Layer("sigmoid")
-    layer3.initialize(3,1)
-
-    # print("L1 W = ", str(layer1.W))
-    # print("L1 b = ", str(layer1.b))
-
-    net.add_layer(layer1)
-    net.add_layer(layer2)
-    #net.add_layer(layer3)
-
-    np.random.seed(3)
-    X, y = sklearn.datasets.make_moons(200, noise=0.20)
-    plt.scatter(X[:, 0], X[:, 1], s=40, c=y, cmap=plt.cm.Spectral)
-    X_n = np.array(X).T
-    y_n = np.array(y, ndmin=2)
-    # print("y shape = ", y.shape)
-    # print("X shape = ", X.shape)
-    # plt.show()
-    # net.plot_decision_boundary(X, y)
-
-    opt = ml.Optimizer(net)
-    opt.train(X_n,y_n)
-
-    net.plot_decision_boundary(X, y)
-
-
-    prediction = net.predict(X_n)
-
-    sum(prediction - y)
-
 
 def layer_initialize_test1():
     np.random.seed(1)
@@ -227,30 +187,97 @@ def full_backprop_test1():
     print("[Truth] db2 = [[-0.16655712]]")
 
 
-def model_test_2():
-    np.random.seed(3)
-    X = np.array([[ 1.62434536, -0.61175641, -0.52817175],
-                  [-1.07296862,  0.86540763, -2.3015387]])
-    y = np.array([True, False, True], ndmin=2)
-    net = ml.Network()
+def soft_max_test1():
+    Z = np.array([1, 2, 3])
+
+    layer1 = ml.Layer("softmax")
+
+def model_test1():
+
+    X, y = sklearn.datasets.make_moons(200, noise=0.2)
+
 
     layer1 = ml.Layer("tanh")
-    layer1.initialize(2, 4)
-    layer2 = ml.Layer("sigmoid")
-    layer2.initialize(4, 1)
+    layer1.initialize(2, 5)
 
-    net.add_layer(layer1)
-    net.add_layer(layer2)
+    layer2 = ml.Layer("tanh")
+    layer2.initialize(5, 5)
 
-    opt = ml.Optimizer(net)
+    layer3 = ml.Layer("tanh")
+    layer3.initialize(5, 5)
 
-    opt.train(X, y, iterations=10000)
+    layer4 = ml.Layer("sigmoid")
+    layer4.initialize(5, 1)
 
-    print("W1 = ", layer1.W)
-    print("b1 = ", layer1.b)
+    layers = [layer1, layer2, layer3, layer4]
 
-    print("W2 = ", layer2.W)
-    print("b2 = ", layer2.b)
+    net = ml.Network(layers)
+
+    # print("L1 W = ", str(layer1.W))
+    # print("L1 b = ", str(layer1.b))
+
+    # net.add_layer(layer1)
+    # net.add_layer(layer2)
+    # net.add_layer(layer3)
+    # net.add_layer(layer4)
+
+    #  plt.scatter(X[:, 0], X[:, 1], s=40, c=y, cmap=plt.cm.Spectral)
+    X_n = np.array(X).T
+    y_n = np.array(y, ndmin=2)
+    # print("y shape = ", y.shape)
+    # print("X shape = ", X.shape)
+    # plt.show()
+    # net.plot_decision_boundary(X, y)
+
+    opt = ml.Optimizer(net, learning_rate=0.1)
+    opt.train(X_n, y_n, iterations=15000)
+
+    net.plot_decision_boundary(X, y)
+    opt.plot_cost()
+
+
+    prediction = net.predict(X_n)
+
+    sum(prediction - y)
+
+def model_test2():
+    digits = load_digits()
+    print(digits.data.shape)
+    # plt.gray()
+    # plt.matshow(digits.images[1])
+    # plt.show()
+    # np.random.seed(2)
+
+    num_samples = digits.data.shape[0]
+    print("number of samples: ", num_samples)
+    labels = np.zeros((num_samples, 10))
+
+    for i, value in enumerate(digits.target):
+        labels[i, value] = 1
+
+    layer1 = ml.Layer("relu")
+    layer1.initialize(64, 10)
+
+    layer2 = ml.Layer("softmax")
+    layer2.initialize(10, 10)
+
+    layer3 = ml.Layer("relu")
+    layer3.initialize(10, 10)
+
+    layer4 = ml.Layer("softmax")
+    layer4.initialize(10, 10)
+
+    layers = [layer1, layer2]
+
+    net = ml.Network(layers)
+
+    opt = ml.Optimizer(net, learning_rate=0.001)
+    X = digits.data.T
+    opt.train(X, labels.T, iterations=10000)
+    opt.plot_cost()
+    accuracy = opt.compute_accuracy(X, digits.target)
+
+    print("Training Set accuracy = ", str(accuracy*100) + "%")
 
 def main():
     print("Running test  case:")
@@ -259,11 +286,11 @@ def main():
     # linear_backward_test1()
     # sigmoid_backward_test1()
     # model_test1()
-    # model_test_2()
+    model_test2()
     # layer_initialize_test1()
     # forward_prop_test1()
     # cost_function_test1()
-    full_backprop_test1()
+    # full_backprop_test1() Not working
     #TODO: write a compute cost test
 
 

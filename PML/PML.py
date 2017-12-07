@@ -143,7 +143,7 @@ class Optimizer:
         return accuracy
 
 class Layer:
-    def __init__(self, act_func, type="fc"):
+    def __init__(self, act_func, type="fc", parameters=None):
         self.n_x = None
         self.n_h = None
 
@@ -168,6 +168,11 @@ class Layer:
         if type is "conv":
             self.stride = None
             self.pad = None
+        elif type is "pool":
+            self.f = None
+            self.stride = None
+        elif type is "fc":
+            self.TODO = None # Should be updated, so that it simply takes a dict  for parameter inputs
 
     def initialize(self, n_x, n_h, pad=None, stride=None):
         """
@@ -186,8 +191,7 @@ class Layer:
 
         return self.W, self.b
 
-    def zero_pad(X, pad):
-
+    def zero_pad(self, X, pad):
         X_pad = np.pad(X, ((0, 0), (pad, pad), (pad, pad), (0, 0)), "constant")
 
         return X_pad
@@ -256,7 +260,6 @@ class Layer:
         return Z
 
     def conv_forward(self, A_prev):
-        ## GRADED FUNCTION: conv_forward
         (m, n_H_prev, n_W_prev, n_C_prev) = A_prev.shape
 
         (f, f, n_C_prev, n_C) = self.W.shape

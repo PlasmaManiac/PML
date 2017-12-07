@@ -240,6 +240,7 @@ def model_test1():
 
     sum(prediction - y)
 
+
 def model_test2():
     digits = load_digits()
     print(digits.data.shape)
@@ -279,6 +280,24 @@ def model_test2():
 
     print("Training Set accuracy = ", str(accuracy*100) + "%")
 
+
+def conv_test1():
+    np.random.seed(1)
+    A_prev = np.random.randn(10, 4, 4, 3)
+    W = np.random.randn(2, 2, 3, 8)
+    b = np.random.randn(1, 1, 1, 8)
+    hparameters = {"pad": 2,
+                   "stride": 2}
+
+    test_layer = ml.Layer("relu", type="conv")
+
+    test_layer.initialize()
+
+    Z, cache_conv = conv_forward(A_prev, W, b, hparameters)
+    print("Z's mean =", np.mean(Z))
+    print("Z[3,2,1] =", Z[3, 2, 1])
+    print("cache_conv[0][1][2][3] =", cache_conv[0][1][2][3])
+
 def main():
     print("Running test  case:")
     # linear_forward_test1()
@@ -286,7 +305,7 @@ def main():
     # linear_backward_test1()
     # sigmoid_backward_test1()
     # model_test1()
-    model_test2()
+    # model_test2()
     # layer_initialize_test1()
     # forward_prop_test1()
     # cost_function_test1()

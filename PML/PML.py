@@ -172,7 +172,7 @@ class Layer:
             self.f = None
             self.stride = None
         elif type is "fc":
-            self.TODO = None # Should be updated, so that it simply takes a dict  for parameter inputs
+            self.TODO = None  #TODO: Should be updated, so that it simply takes a dict  for parameter inputs
 
     def initialize(self, n_x, n_h, pad=None, stride=None):
         """
@@ -296,6 +296,106 @@ class Layer:
 
             assert (self.Z.shape == (m, n_H, n_W, n_C))
         return self.Z
+
+    def pool_forward(self, A_prev):
+        # Retrieve dimensions from the input shape
+        (m, n_H_prev, n_W_prev, n_C_prev) = A_prev.shape
+
+        f = self.stride
+        stride = self.stride
+
+        # Define the dimensions of the output
+        n_H = int(1 + (n_H_prev - f) / stride)
+        n_W = int(1 + (n_W_prev - f) / stride)
+        n_C = n_C_prev
+
+        # Initialize output matrix A
+        A = np.zeros((m, n_H, n_W, n_C))
+
+        for i in range(m):  # loop over the training examples
+            for h in range(n_H):  # loop on the vertical axis of the output volume
+                for w in range(n_W):  # loop on the horizontal axis of the output volume
+                    for c in range(n_C):  # loop over the channels of the output volume
+
+                        # Find the corners of the current "slice"
+                        vert_start = h * stride
+                        vert_end = h * stride + f
+                        horiz_start = w * stride
+                        horiz_end = w * stride + f
+
+                        # Use the corners to define the current slice on the ith training example of A_prev, channel c.
+                        a_prev_slice = A_prev[i, vert_start:vert_end, horiz_start:horiz_end, c]
+
+                        if self.mode == "max":
+                            A[i, h, w, c] = np.max(a_prev_slice)
+                        elif self.mode == "average": # TODO: add these two as values of layer
+                            A[i, h, w, c] = np.mean(a_prev_slice)
+
+        # Making sure the output shape is correct
+        assert (A.shape == (m, n_H, n_W, n_C))
+
+        return A
+
+    def conv_backward(self, dZ):
+
+        ### START CODE HERE ###
+        # Retrieve information from "cache"
+
+        A_prev = self.A_prev
+        W      = self.W
+        b      = self.b
+        stride = self.stride
+        pad    = self.pad
+
+        # Retrieve dimensions from A_prev's shape
+        (m, n_H_prev, n_W_prev, n_C_prev) = A_prev.shape
+
+        # Retrieve dimensions from W's shape
+        (f, f, n_C_prev, n_C) = W.shape
+
+        # Retrieve dimensions from dZ's shape
+        (m, n_H, n_W, n_C) = dZ.shape
+
+        # Initialize dA_prev, dW, db with the correct shapes
+        dA_prev = np.zeros(A_prev.shape)
+        dW = np.zeros(W.shape)
+        db = np.zeros(b.shape)
+
+        # Pad A_prev and dA_prev
+        A_prev_pad = self.zero_pad(A_prev, pad)
+        dA_prev_pad = self.zero_pad(dA_prev, pad)
+
+        for i in range(m):  # loop over the training examples
+
+            # select ith training example from A_prev_pad and dA_prev_pad
+            a_prev_pad = A_prev_pad[i, :, :, :]
+            da_prev_pad = dA_prev_pad[i, :, :, :]
+
+            for h in range(n_H):  # loop over vertical axis of the output volume
+                for w in range(n_W):  # loop over horizontal axis of the output volume
+                    for c in range(n_C):  # loop over the channels of the output volume
+
+                        # Find the corners of the current "slice"
+                        vert_start = stride * h
+                        vert_end = stride * h + f
+                        horiz_start = stride * w
+                        horiz_end = stride * w + f
+
+                        # Use the corners to define the slice from a_prev_pad
+                        a_slice = a_prev_pad[vert_start:vert_end, horiz_start:horiz_end, :]
+                        # Update gradients for the window and the filter's parameters using the code formulas given above
+                        da_prev_pad[vert_start:vert_end, horiz_start:horiz_end, :] += W[:, :, :, c] * dZ[i, h, w, c]
+                        dW[:, :, :, c] += a_slice * dZ[i, h, w, c]
+                        db[:, :, :, c] += dZ[i, h, w, c]
+
+            # Set the ith training example's dA_prev to the unpaded da_prev_pad (Hint: use X[pad:-pad, pad:-pad, :])
+            dA_prev[i, :, :, :] = da_prev_pad[pad:-pad, pad:-pad, :]
+        ### END CODE HERE ###
+
+        # Making sure your output shape is correct
+        assert (dA_prev.shape == (m, n_H_prev, n_W_prev, n_C_prev))
+
+        return dA_prev, dW, db
 
 
     def back_propagate(self, dZ_prev, W_prev):

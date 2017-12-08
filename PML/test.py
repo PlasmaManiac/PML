@@ -293,7 +293,7 @@ def conv_test1():
 
     test_layer.initialize()
 
-    Z, cache_conv = conv_forward(A_prev, W, b, hparameters)
+    Z, cache_conv =  None, None # conv_forward(A_prev, W, b, hparameters)
     print("Z's mean =", np.mean(Z))
     print("Z[3,2,1] =", Z[3, 2, 1])
     print("cache_conv[0][1][2][3] =", cache_conv[0][1][2][3])

@@ -81,6 +81,7 @@ class Network:
         plt.scatter(X[:, 0], X[:, 1], c=y, cmap=plt.cm.Spectral)
         plt.show()
 
+
 class Optimizer:
     """
 
@@ -142,14 +143,16 @@ class Optimizer:
 
         return accuracy
 
+
 class Layer:
-    def __init__(self, act_func, type="fc", parameters=None):
-        self.n_x = None
-        self.n_h = None
+    def __init__(self, type="fc", parameters=None):
 
-        self.act_func = act_func
+        self.n_x = parameters["n_x"]
+        self.n_h = parameters["n_h"]
 
-        self.layer_type = None
+        self.act_func = parameters["act_func"]
+
+        self.type = type
 
         self.W = None
         self.b = None
@@ -163,25 +166,21 @@ class Layer:
         self.db = None
         self.dA = None
 
-        self.type = type
-
         if type is "conv":
-            self.stride = None
-            self.pad = None
+            self.stride = parameters["stride"]
+            self.pad = parameters["pad"]
         elif type is "pool":
-            self.f = None
-            self.stride = None
+            self.f = parameters["f"]
+            self.stride = parameters["sride"]
         elif type is "fc":
-            self.TODO = None  #TODO: Should be updated, so that it simply takes a dict  for parameter inputs
+            self.initialize_fc(self.n_x, self.n_h)   #TODO: Should be updated, so that it simply takes a dict  for parameter inputs
 
-    def initialize(self, n_x, n_h, pad=None, stride=None):
+    def initialize_fc(self, n_x, n_h):
         """
         :param n_x: size of input layer
         :param n_h: size of hidden layer
         :param layer_type: the type of the layer
         """
-        self.n_x = n_x
-        self.n_h = n_h
 
         self.W = np.random.randn(n_h, n_x) * 0.1
         self.b = np.zeros((n_h, 1))
@@ -190,6 +189,8 @@ class Layer:
         assert (self.b.shape == (n_h, 1))
 
         return self.W, self.b
+
+    def initialize_fc
 
     def zero_pad(self, X, pad):
         X_pad = np.pad(X, ((0, 0), (pad, pad), (pad, pad), (0, 0)), "constant")
@@ -397,6 +398,69 @@ class Layer:
 
         return dA_prev, dW, db
 
+    def pool_backward(self, dA, mode="max"):
+
+
+        stride = self.stride
+        f = self.f
+
+        # Retrieve dimensions from A_prev's shape and dA's shape (≈2 lines)
+        m, n_H, n_W, n_C = dA.shape
+
+        # Initialize dA_prev with zeros (≈1 line)
+        dA_prev = np.zeros(self.A_prev.shape)
+
+        for i in range(m):  # loop over the training examples
+
+            # select training example from A_prev (≈1 line)
+            a_prev = self.A_prev[i, :, :, :]
+
+            for h in range(n_H):  # loop on the vertical axis
+                for w in range(n_W):  # loop on the horizontal axis
+                    for c in range(n_C):  # loop over the channels (depth)
+
+                        # Find the corners of the current "slice" (≈4 lines)
+                        vert_start = h * stride
+                        vert_end = h * stride + f
+                        horiz_start = w * stride
+                        horiz_end = w * stride + f
+
+                        # Compute the backward propagation in both modes.
+                        if mode == "max":
+
+                            # Use the corners and "c" to define the current slice from a_prev (≈1 line)
+                            a_prev_slice = a_prev[vert_start:vert_end, horiz_start:horiz_end, c]
+                            # Create the mask from a_prev_slice (≈1 line)
+                            mask = self.create_mask_from_window(a_prev_slice)
+                            # Set dA_prev to be dA_prev + (the mask multiplied by the correct entry of dA) (≈1 line)
+                            dA_prev[i, vert_start: vert_end, horiz_start: horiz_end, c] += mask * dA[i, h, w, c]
+
+                        elif mode == "average":
+
+                            # Get the value a from dA (≈1 line)
+                            da = dA[i, h, w, c]
+                            # Define the shape of the filter as fxf (≈1 line)
+                            shape = (f, f)
+                            # Distribute it to get the correct slice of dA_prev. i.e. Add the distributed value of da. (≈1 line)
+                            dA_prev[i, vert_start: vert_end, horiz_start: horiz_end, c] += self.distribute_value(da, shape)
+
+        # Making sure your output shape is correct
+        assert (dA_prev.shape == self.A_prev.shape)
+        self.dA_prev = dA_prev
+
+        return dA_prev
+
+    def create_mask_from_window(self, x):
+        mask = x == np.max(x)
+
+        return mask
+
+    def distribute_value(self, dz, shape):
+        (n_H, n_W) = shape
+        average = np.mean(dz) / (n_H * n_W)
+
+        a = np.full((shape), average)
+        return a
 
     def back_propagate(self, dZ_prev, W_prev):
         dZ = None

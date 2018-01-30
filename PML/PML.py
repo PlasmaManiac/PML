@@ -110,6 +110,8 @@ class Optimizer:
         :return:
         """
         # TODO: Update this to be more versatile
+        output = np.mean()
+
         m = Y.shape[1]
         logprobs = np.multiply(np.log(AL), Y) + np.multiply(np.log(1 - AL), 1 - Y)
         cost = -1 *np.sum(logprobs) * (1 / m)
@@ -166,14 +168,25 @@ class Layer:
         self.db = None
         self.dA = None
 
+
+        # TODO: Allow for a way to properlly define the W matrix for conv layers
+        # IE: Have an input where in the num of channels defines the size of the W layer.
+        # needs to know the channel size of the previous layer to construct the W matrix.
+        # Should be passed in OR Could be made once the set is initialized with random variables.
+        # So then the NETWORK would have to be called to initialize ( could make more sense)
+        # Allows for each layer to initialized in the same way. (Same method)
+
+
         if type is "conv":
             self.stride = parameters["stride"]
             self.pad = parameters["pad"]
         elif type is "pool":
             self.f = parameters["f"]
-            self.stride = parameters["sride"]
+            self.stride = parameters["stride"]
+            self.mode = "max"
         elif type is "fc":
-            self.initialize_fc(self.n_x, self.n_h)   #TODO: Should be updated, so that it simply takes a dict  for parameter inputs
+            self.initialize_fc(self.n_x, self.n_h)
+            #TODO: Should be updated, so that it simply takes a dict  for parameter inputs
 
     def initialize_fc(self, n_x, n_h):
         """
@@ -190,11 +203,8 @@ class Layer:
 
         return self.W, self.b
 
-    def initialize_fc
-
     def zero_pad(self, X, pad):
         X_pad = np.pad(X, ((0, 0), (pad, pad), (pad, pad), (0, 0)), "constant")
-
         return X_pad
 
     def linear_forward(self, input_A):
@@ -302,7 +312,7 @@ class Layer:
         # Retrieve dimensions from the input shape
         (m, n_H_prev, n_W_prev, n_C_prev) = A_prev.shape
 
-        f = self.stride
+        f = self.f
         stride = self.stride
 
         # Define the dimensions of the output
@@ -398,8 +408,7 @@ class Layer:
 
         return dA_prev, dW, db
 
-    def pool_backward(self, dA, mode="max"):
-
+    def pool_backward(self, dA):
 
         stride = self.stride
         f = self.f
@@ -426,7 +435,7 @@ class Layer:
                         horiz_end = w * stride + f
 
                         # Compute the backward propagation in both modes.
-                        if mode == "max":
+                        if self.mode == "max":
 
                             # Use the corners and "c" to define the current slice from a_prev (≈1 line)
                             a_prev_slice = a_prev[vert_start:vert_end, horiz_start:horiz_end, c]
@@ -435,7 +444,7 @@ class Layer:
                             # Set dA_prev to be dA_prev + (the mask multiplied by the correct entry of dA) (≈1 line)
                             dA_prev[i, vert_start: vert_end, horiz_start: horiz_end, c] += mask * dA[i, h, w, c]
 
-                        elif mode == "average":
+                        elif self.mode == "average":
 
                             # Get the value a from dA (≈1 line)
                             da = dA[i, h, w, c]

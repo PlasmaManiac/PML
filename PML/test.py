@@ -281,22 +281,175 @@ def model_test2():
     print("Training Set accuracy = ", str(accuracy*100) + "%")
 
 
-def conv_test1():
+def zeropad_test():
+    print("Zero padding test")
+    layer1 = ml.Layer(parameters={
+        "n_h" : 1,
+        "n_x" : 1,
+        "act_func" : "tanh",
+    })
+    np.random.seed(1)
+    x = np.random.randn(4, 3, 3, 2)
+    x_pad = layer1.zero_pad(x, 2)
+
+    print("x.shape =", x.shape)
+    print("x_pad.shape =", x_pad.shape)
+    print("x[1,1] =", x[1, 1])
+    print("x_pad[1,1] =", x_pad[1, 1])
+
+    fig, axarr = plt.subplots(1, 2)
+    axarr[0].set_title('x')
+    axarr[0].imshow(x[0, :, :, 0])
+    axarr[1].set_title('x_pad')
+    axarr[1].imshow(x_pad[0, :, :, 0])
+    plt.show()
+
+
+def conv_single_step_test():
+    print("Conv single step test")
+    np.random.seed(1)
+    layer1 = ml.Layer(parameters={
+        "n_h": 1,
+        "n_x": 1,
+        "act_func": "tanh",
+    })
+    a_slice_prev = np.random.randn(4, 4, 3)
+    W = np.random.randn(4, 4, 3)
+    b = np.random.randn(1, 1, 1)
+
+    Z = layer1.conv_single_step(a_slice_prev, W, b)
+    print("Z =", Z)
+
+def conv_test():
+    layer1 = ml.Layer(
+        type ="conv",
+        parameters={"C":  8, "sx": 2, "act_func": "tanh"
+        })
+
     np.random.seed(1)
     A_prev = np.random.randn(10, 4, 4, 3)
-    W = np.random.randn(2, 2, 3, 8)
-    b = np.random.randn(1, 1, 1, 8)
+    layer1.W = np.random.randn(2, 2, 3, 8)
+    layer1.b = np.random.randn(1, 1, 1, 8)
     hparameters = {"pad": 2,
                    "stride": 2}
 
-    test_layer = ml.Layer("relu", type="conv")
+    layer1.pad = hparameters["pad"]
+    layer1.stride = hparameters["stride"]
 
-    test_layer.initialize()
-
-    Z, cache_conv =  None, None # conv_forward(A_prev, W, b, hparameters)
+    Z = layer1.conv_forward(A_prev)
     print("Z's mean =", np.mean(Z))
     print("Z[3,2,1] =", Z[3, 2, 1])
-    print("cache_conv[0][1][2][3] =", cache_conv[0][1][2][3])
+    # print("cache_conv[0][1][2][3] =", cache_conv[0][1][2][3])
+
+def pool_for_test():
+    layer1 = ml.Layer(parameters={
+        "n_h": 1,
+        "n_x": 1,
+        "act_func": "tanh",
+    })
+
+    np.random.seed(1)
+    A_prev = np.random.randn(2, 4, 4, 3)
+    hparameters = {"stride": 2, "f": 3}
+
+    layer1.f = hparameters["f"]
+    layer1.stride = hparameters["stride"]
+    layer1.mode = "max"
+
+    A = layer1.pool_forward(A_prev)
+    print("mode = max")
+    print("A =", A)
+    print()
+
+    layer1.mode = "average"
+    A = layer1.pool_forward(A_prev)
+    print("mode = average")
+    print("A =", A)
+
+def conv_back_test():
+
+    layer1 = ml.Layer(parameters={
+        "n_h": 1,
+        "n_x": 1,
+        "act_func": "tanh",
+    })
+
+    np.random.seed(1)
+
+    layer1.A_prev = np.random.randn(10, 4, 4, 3)
+    layer1.W = np.random.randn(2, 2, 3, 8)
+    layer1.b = np.random.randn(1, 1, 1, 8)
+    hparameters = {"pad": 2,
+                   "stride": 2}
+
+    layer1.pad = hparameters["pad"]
+    layer1.stride = hparameters["stride"]
+
+    Z = layer1.conv_forward(layer1.A_prev)
+
+    np.random.seed(1)
+    dA, dW, db = layer1.conv_backward(Z)
+    print("dA_mean =", np.mean(dA))
+    print("dW_mean =", np.mean(dW))
+    print("db_mean =", np.mean(db))
+
+def mask_test():
+    layer1 = ml.Layer(parameters={
+        "n_h": 1,
+        "n_x": 1,
+        "act_func": "tanh",
+    })
+
+    np.random.seed(1)
+    x = np.random.randn(2, 3)
+
+    mask = layer1.create_mask_from_window(x)
+    print('x = ', x)
+    print("mask = ", mask)
+
+def dist_test():
+    layer1 = ml.Layer(parameters={
+        "n_h": 1,
+        "n_x": 1,
+        "act_func": "tanh",
+    })
+    a = layer1.distribute_value(2, (2, 2))
+    print('distributed value =', a)
+
+def pool_back_test():
+    layer1 = ml.Layer(parameters={
+        "n_h": 1,
+        "n_x": 1,
+        "act_func": "tanh",
+    })
+    np.random.seed(1)
+    A_prev = np.random.randn(5, 5, 3, 2)
+    hparameters = {"stride": 1, "f": 2}
+
+    layer1.A_prev = A_prev
+    layer1.stride = hparameters["stride"]
+    layer1.f = hparameters["f"]
+
+
+    layer1.mode = "max"
+    A = layer1.pool_forward(A_prev)
+    layer1.A = A
+    dA = np.random.randn(5, 4, 2, 2)
+    layer1.dA = dA
+
+    layer1.mode = "max"
+    dA_prev = layer1.pool_backward(dA)
+    print("mode = max")
+    print('mean of dA = ', np.mean(dA))
+    print('dA_prev[1,1] = ', dA_prev[1, 1])
+    print()
+
+    layer1.mode = "average"
+    dA_prev = layer1.pool_backward(dA)
+    print("mode = average")
+    print('mean of dA = ', np.mean(dA))
+    print('dA_prev[1,1] = ', dA_prev[1, 1])
+
 
 def main():
     print("Running test  case:")
@@ -310,7 +463,18 @@ def main():
     # forward_prop_test1()
     # cost_function_test1()
     # full_backprop_test1() Not working
+    # zeropad_test()
+    # conv_single_step_test()
+    conv_test()
+    # pool_for_test()
+    # conv_back_test()
+    # mask_test()
+    # dist_test()
+    # pool_back_test()
+
     #TODO: write a compute cost test
+
+
 
 
 if __name__ == "__main__": main()

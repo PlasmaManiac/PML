@@ -281,7 +281,6 @@ class Layer:
         n_H = int((n_H_prev - f + 2 * pad) / stride) + 1
         n_W = int((n_W_prev - f + 2 * pad) / stride) + 1
 
-        # Initialize the output volume Z with zeros. (≈1 line)
         self.Z = np.zeros((m, n_H, n_W, n_C))
 
         # Create A_prev_pad by padding A_prev
@@ -413,44 +412,34 @@ class Layer:
         stride = self.stride
         f = self.f
 
-        # Retrieve dimensions from A_prev's shape and dA's shape (≈2 lines)
         m, n_H, n_W, n_C = dA.shape
 
-        # Initialize dA_prev with zeros (≈1 line)
         dA_prev = np.zeros(self.A_prev.shape)
 
         for i in range(m):  # loop over the training examples
 
-            # select training example from A_prev (≈1 line)
             a_prev = self.A_prev[i, :, :, :]
 
             for h in range(n_H):  # loop on the vertical axis
                 for w in range(n_W):  # loop on the horizontal axis
-                    for c in range(n_C):  # loop over the channels (depth)
+                    for c in range(n_C):  # loop over the channels
 
-                        # Find the corners of the current "slice" (≈4 lines)
                         vert_start = h * stride
                         vert_end = h * stride + f
                         horiz_start = w * stride
                         horiz_end = w * stride + f
 
-                        # Compute the backward propagation in both modes.
                         if self.mode == "max":
 
-                            # Use the corners and "c" to define the current slice from a_prev (≈1 line)
                             a_prev_slice = a_prev[vert_start:vert_end, horiz_start:horiz_end, c]
-                            # Create the mask from a_prev_slice (≈1 line)
+
                             mask = self.create_mask_from_window(a_prev_slice)
-                            # Set dA_prev to be dA_prev + (the mask multiplied by the correct entry of dA) (≈1 line)
                             dA_prev[i, vert_start: vert_end, horiz_start: horiz_end, c] += mask * dA[i, h, w, c]
 
                         elif self.mode == "average":
 
-                            # Get the value a from dA (≈1 line)
                             da = dA[i, h, w, c]
-                            # Define the shape of the filter as fxf (≈1 line)
                             shape = (f, f)
-                            # Distribute it to get the correct slice of dA_prev. i.e. Add the distributed value of da. (≈1 line)
                             dA_prev[i, vert_start: vert_end, horiz_start: horiz_end, c] += self.distribute_value(da, shape)
 
         # Making sure your output shape is correct

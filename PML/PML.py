@@ -9,18 +9,17 @@ import matplotlib.pyplot as plt
 
 
 class Network:
-    """
-
-    """
     def __init__(self, layers):
         self.layers = []
         self.L = 0
+        self.opt = None
 
         for layer in layers:
             self.add_layer(layer)
 
     def add_layer(self, layer):
         self.layers.append(layer)
+        Layer.net = self
         self.L += 1
 
     def forward_propagate(self, input_data):
@@ -62,6 +61,8 @@ class Network:
         return prediction
 
 
+
+
     def plot_decision_boundary(self, X, y):
         # Set min and max values and give it some padding
         x_min, x_max = X[:, 0].min() - .5, X[:, 0].max() + .5
@@ -83,13 +84,13 @@ class Network:
 
 
 class Optimizer:
-    """
-
-    """
     def __init__(self, net, learning_rate=0.1):
         self.network = net
+        net.opt = self
         self.learning_rate = learning_rate
         self.costs = []
+        self.reg = None
+        self.lamb = 0.01
 
     def train(self, input_data, labels, iterations=10000):
         for i in range(iterations):
@@ -115,9 +116,25 @@ class Optimizer:
         m = Y.shape[1]
         logprobs = np.multiply(np.log(AL), Y) + np.multiply(np.log(1 - AL), 1 - Y)
         cost = -1 *np.sum(logprobs) * (1 / m)
-        cost = np.squeeze(cost)
+        cost = np.squeeze(cost) + self.regularization(m)
         assert (cost.shape == ())
         return cost
+
+    def regularization(self, m):
+        # Regularization
+        # L1
+        # L2
+        W_norm = 0
+
+        if self.reg is "L2":
+            for W in self.network.layers.W:
+                W_norm += np.linalg.norm(W, ord=2)
+
+        elif self.reg is "L1":
+            for W in self.network.layers.W:
+                W_norm += np.linalg.norm(W, ord=1)
+
+        return self.lamb /(2*m) * W_norm
 
     def update_parameters(self):
         L = len(self.network.layers)
@@ -168,6 +185,7 @@ class Layer:
         self.db = None
         self.dA = None
 
+        self.net = None
 
         # TODO: Allow for a way to properlly define the W matrix for conv layers
         # IE: Have an input where in the num of channels defines the size of the W layer.
@@ -236,7 +254,6 @@ class Layer:
         return self.A
 
     def sigmoid_backward(self, dZ_prev, W_prev):
-
         dA = np.dot(W_prev.T, dZ_prev)
         sig_deriv = np.exp(self.Z) / np.power((np.exp(self.Z) + 1), 2)
         self.dZ = dA * sig_deriv
@@ -251,17 +268,12 @@ class Layer:
         return None
 
     def linear_backward(self, dZ):
-        """
-
-        :param dZ:
-        :return: The gradients of the layer
-        """
         # Need W_prev, dZ_prev
         # dZ = A - Y for output layer
         # dZ = np.dot(W2.T, dZ2) * (1 - np.power(A1, 2))
         m = self.A_prev.shape[1]
 
-        self.dW = (1 / m) * np.dot(dZ, self.A_prev.T)
+        self.dW = (1 / m) * np.dot(dZ, self.A_prev.T) #Need to add for a regularization value
         self.db = (1 / m) * np.sum(dZ, axis=1, keepdims=True)
 
         return self.dW, self.db
@@ -283,7 +295,6 @@ class Layer:
 
         self.Z = np.zeros((m, n_H, n_W, n_C))
 
-        # Create A_prev_pad by padding A_prev
         A_prev_pad = self.zero_pad(A_prev, pad)
 
         for i in range(m):  # loop over the batch of training examples
@@ -292,16 +303,13 @@ class Layer:
                 for w in range(n_W):  # loop over horizontal axis of the output volume
                     for c in range(n_C):  # loop over channels (= #filters) of the output volume
 
-                        # Find the corners of the current "slice"
                         vert_start = h * stride
                         vert_end = h * stride + f
                         horiz_start = w * stride
                         horiz_end = w * stride + f
 
-                        # Use the corners to define the (3D) slice of a_prev_pad (See Hint above the cell)
                         a_slice_prev = a_prev_pad[vert_start:vert_end, horiz_start:horiz_end, :]
 
-                        # Convolve the (3D) slice with the correct filter W and bias b, to get back one output neuron.
                         self.Z[i, h, w, c] = self.conv_single_step(a_slice_prev, self.W[:, :, :, c], self.b[:, :, :, c])
 
             assert (self.Z.shape == (m, n_H, n_W, n_C))
@@ -319,7 +327,6 @@ class Layer:
         n_W = int(1 + (n_W_prev - f) / stride)
         n_C = n_C_prev
 
-        # Initialize output matrix A
         A = np.zeros((m, n_H, n_W, n_C))
 
         for i in range(m):  # loop over the training examples
@@ -327,13 +334,11 @@ class Layer:
                 for w in range(n_W):  # loop on the horizontal axis of the output volume
                     for c in range(n_C):  # loop over the channels of the output volume
 
-                        # Find the corners of the current "slice"
                         vert_start = h * stride
                         vert_end = h * stride + f
                         horiz_start = w * stride
                         horiz_end = w * stride + f
 
-                        # Use the corners to define the current slice on the ith training example of A_prev, channel c.
                         a_prev_slice = A_prev[i, vert_start:vert_end, horiz_start:horiz_end, c]
 
                         if self.mode == "max":
@@ -347,10 +352,6 @@ class Layer:
         return A
 
     def conv_backward(self, dZ):
-
-        ### START CODE HERE ###
-        # Retrieve information from "cache"
-
         A_prev = self.A_prev
         W      = self.W
         b      = self.b
@@ -385,24 +386,17 @@ class Layer:
                 for w in range(n_W):  # loop over horizontal axis of the output volume
                     for c in range(n_C):  # loop over the channels of the output volume
 
-                        # Find the corners of the current "slice"
                         vert_start = stride * h
                         vert_end = stride * h + f
                         horiz_start = stride * w
                         horiz_end = stride * w + f
 
-                        # Use the corners to define the slice from a_prev_pad
                         a_slice = a_prev_pad[vert_start:vert_end, horiz_start:horiz_end, :]
-                        # Update gradients for the window and the filter's parameters using the code formulas given above
                         da_prev_pad[vert_start:vert_end, horiz_start:horiz_end, :] += W[:, :, :, c] * dZ[i, h, w, c]
                         dW[:, :, :, c] += a_slice * dZ[i, h, w, c]
                         db[:, :, :, c] += dZ[i, h, w, c]
 
-            # Set the ith training example's dA_prev to the unpaded da_prev_pad (Hint: use X[pad:-pad, pad:-pad, :])
             dA_prev[i, :, :, :] = da_prev_pad[pad:-pad, pad:-pad, :]
-        ### END CODE HERE ###
-
-        # Making sure your output shape is correct
         assert (dA_prev.shape == (m, n_H_prev, n_W_prev, n_C_prev))
 
         return dA_prev, dW, db
